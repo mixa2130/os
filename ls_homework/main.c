@@ -5,7 +5,17 @@
 #include <pwd.h>
 #include <time.h>
 
-void get_file_mod_date(time_t ttime) {
+int count_digits(int num){
+    int digits = 0;
+    while (num > 0){
+        digits += 1;
+        num /= 10;
+    }
+
+    return digits;
+}
+
+void get_file_modification_date(time_t ttime) {
     struct tm *ptm = localtime(&ttime);
 
     // month
@@ -58,31 +68,15 @@ void get_file_mod_date(time_t ttime) {
 
     if (hours < 10 && minutes < 10)
         printf("0%d:0%d ", hours, minutes);
-    if (hours < 10 && minutes > 10)
+    if (hours < 10 && minutes >= 10)
         printf("0%d:%d ", hours, minutes);
-    if (hours > 10 && minutes < 10)
+    if (hours >= 10 && minutes < 10)
         printf("%d:0%d ", hours, minutes);
-    if (hours > 10 && minutes > 10)
+    if (hours >= 10 && minutes >= 10)
         printf("%d:%d ", hours, minutes);
 }
 
-void get_file_info(char *filename, int argc) {
-    struct stat sb;
-    int ret;
-
-    if (argc < 2) {
-        fprintf(stderr, "usage: %s\n", filename);
-        return;
-    }
-
-    stat(filename, &sb);
-//    if (ret) {
-//        perror("stat");
-//        return;
-//    }
-
-    // file mods
-    unsigned long file_mods = sb.st_mode;
+void get_file_mods(unsigned long file_mods) {
     switch (file_mods & S_IFMT) {
         case S_IFBLK:
             printf("b");
@@ -118,6 +112,25 @@ void get_file_info(char *filename, int argc) {
     printf(file_mods & S_IROTH ? "r" : "-");
     printf(file_mods & S_IWOTH ? "w" : "-");
     printf(file_mods & S_IXOTH ? "x" : "-");
+}
+
+void get_file_info(char *filename, int argc, int max_digits) {
+    struct stat sb;
+    int ret;
+
+    if (argc < 2) {
+        fprintf(stderr, "usage: %s\n", filename);
+        return;
+    }
+
+    ret = stat(filename, &sb);
+    if (ret) {
+        perror("stat");
+        return;
+    }
+
+    // file mods
+    get_file_mods(sb.st_mode);
 
     // links
     printf(" %lu ", sb.st_nlink);
@@ -141,34 +154,51 @@ void get_file_info(char *filename, int argc) {
         printf("%s ", pwd->pw_name);
 
     // file size
+    int file_size_digits = count_digits(sb.st_size);
+    for (int i=0; i < max_digits - file_size_digits; i++)
+        printf(" ");
+
     printf("%lu ", sb.st_size);
 
     // file modification date
-    get_file_mod_date(sb.st_mtime);
-
-
-//    printf("%s\n", filename);
+    get_file_modification_date(sb.st_mtime);
 }
 
-int count_memory_blocks(char *dirname) {
+int count_memory_blocks(char *dirname, int *max_size) {
     register struct dirent *dir_buf;
-    DIR *fdir = opendir(dirname);
+    DIR *fdir;
     int res = 0;
 
-//    if ((fdir = opendir(dirname)) == NULL) {
-//        fprintf(stderr, "Can't read %s\n", dirname);
-//        return -1;
-//    }
+    struct stat sb;
+    if ((fdir = opendir(dirname)) == NULL) {
+        fprintf(stderr, "Can't read %s\n", dirname);
+        return -1;
+    }
 
-    while ((dir_buf = readdir(fdir)) != NULL)
-        res += dir_buf->d_type;
+    while ((dir_buf = readdir(fdir)) != NULL) {
+        char file_path[strlen(dirname) + strlen(dir_buf->d_name) + 10];
+        sprintf(file_path, "%s/%s", dirname, dir_buf->d_name);
+        stat(file_path, &sb);
 
+        if (*max_size < sb.st_size)
+            *max_size = sb.st_size;
+
+        res += sb.st_blocks;
+    }
     closedir(fdir);
-    return res;
+
+    *max_size = count_digits(*max_size);
+    return res / 2;
 }
 
-int listdir(char *dirname) {
-//    printf("total %d\n", count_memory_blocks(dirname));
+void listdir(char *dirname) {
+    int max_file_size_digits = 0; // to understand how much spaces we need in an output
+    int memory_blocks = count_memory_blocks(dirname, &max_file_size_digits);
+
+    if (memory_blocks == -1)
+        return;
+
+    printf("total: %d\n", memory_blocks);
     register struct dirent *dir_buf;
     DIR *fdir = opendir(dirname);
 
@@ -176,17 +206,15 @@ int listdir(char *dirname) {
         if (dir_buf->d_ino == 0) continue;
         else {
             // getting absolute file path
-            char file_path[512];
+            char file_path[strlen(dirname) + strlen(dir_buf->d_name) + 10];
             sprintf(file_path, "%s/%s", dirname, dir_buf->d_name);
 
-            get_file_info(file_path, 2);
+            get_file_info(file_path, 2, max_file_size_digits);
 
             printf("%s\n", dir_buf->d_name);
         }
     }
     closedir(fdir);
-
-    return 0;
 }
 
 int main(int argc, char *argv[]) {

@@ -4,6 +4,7 @@
 #include <string.h>
 #include <pwd.h>
 #include <time.h>
+#include <grp.h>
 
 int count_digits(int num) {
     if (num == 0)
@@ -138,10 +139,10 @@ void get_file_info(char *filename, int argc, int max_digits) {
     // links
     printf(" %lu ", sb.st_nlink);
 
-    struct passwd *pwd;
-
     // file owner
+    struct passwd *pwd;
     pwd = getpwuid(sb.st_uid);
+
     if (pwd == NULL) {
         perror("getpwuid");
         return;
@@ -149,12 +150,14 @@ void get_file_info(char *filename, int argc, int max_digits) {
         printf("%s ", pwd->pw_name);
 
     // group file owner
-    pwd = getpwuid(sb.st_gid);
-    if (pwd == NULL) {
-        perror("getpwuid");
+    struct group *grp;
+    grp = getgrgid(sb.st_gid);
+
+    if (grp == NULL) {
+        perror("getgrgid");
         return;
     } else
-        printf("%s ", pwd->pw_name);
+        printf("%s ", grp->gr_name);
 
     // file size
     int file_size_digits = count_digits(sb.st_size);

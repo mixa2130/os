@@ -5,9 +5,12 @@
 #include <pwd.h>
 #include <time.h>
 
-int count_digits(int num){
+int count_digits(int num) {
+    if (num == 0)
+        return 1;
+
     int digits = 0;
-    while (num > 0){
+    while (num > 0) {
         digits += 1;
         num /= 10;
     }
@@ -155,7 +158,7 @@ void get_file_info(char *filename, int argc, int max_digits) {
 
     // file size
     int file_size_digits = count_digits(sb.st_size);
-    for (int i=0; i < max_digits - file_size_digits; i++)
+    for (int i = 0; i < max_digits - file_size_digits; i++)
         printf(" ");
 
     printf("%lu ", sb.st_size);
@@ -198,7 +201,8 @@ void listdir(char *dirname) {
     if (memory_blocks == -1)
         return;
 
-    printf("total: %d\n", memory_blocks);
+    printf("total %d\n", memory_blocks);
+
     register struct dirent *dir_buf;
     DIR *fdir = opendir(dirname);
 

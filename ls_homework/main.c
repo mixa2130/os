@@ -164,7 +164,7 @@ void get_file_info(char *filename, int argc, int max_digits) {
     for (int i = 0; i < max_digits - file_size_digits; i++)
         printf(" ");
 
-    printf("%lu ", sb.st_size);
+    printf("%ld ", sb.st_size);
 
     // file modification date
     get_file_modification_date(sb.st_mtime);

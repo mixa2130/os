@@ -137,7 +137,7 @@ void get_file_info(char *filename, int argc, int max_digits) {
     get_file_mods(sb.st_mode);
 
     // links
-    printf(" %lu ", sb.st_nlink);
+    printf(" %hu ", (short)sb.st_nlink);
 
     // file owner
     struct passwd *pwd;
@@ -164,7 +164,7 @@ void get_file_info(char *filename, int argc, int max_digits) {
     for (int i = 0; i < max_digits - file_size_digits; i++)
         printf(" ");
 
-    printf("%ld ", sb.st_size);
+    printf("%lld ", (long long)sb.st_size);
 
     // file modification date
     get_file_modification_date(sb.st_mtime);

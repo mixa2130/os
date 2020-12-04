@@ -2,7 +2,10 @@ CC=gcc
 
 all: run
 
-build: main.c
+clean:
+	rm -f check
+
+build: clean
 	gcc main.c -o check
 
 run: build

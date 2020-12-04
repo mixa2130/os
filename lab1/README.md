@@ -1,4 +1,4 @@
-<img src="screenshots/file1.png">
+<img src="screenshots/screenshot.png">
 
 ## How to run
 ```bash

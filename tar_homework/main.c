@@ -1,7 +1,9 @@
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #define ERROR_ALLOCATE_MEMORY -2
 #define ERROR_OPEN_FILE -3
@@ -116,11 +118,42 @@ int write_tar(int argc, char *argv[]) {
     printf("Error opening file");
     exit(ERROR_OPEN_FILE);
   }
+  // header
+  fwrite(my_tar.header, sizeof(char), strlen(my_tar.header), file);
+  fwrite("\n", sizeof(char), 1, file);
 
-  // write tar to binary file
+  for (int i = 0; i < my_tar.file_count; i++) {
+    fwrite(my_tar.filenames[i], sizeof(char), strlen(my_tar.filenames[i]),
+           file);
+    if (i + 1 != my_tar.file_count)
+      fwrite(" ", sizeof(char), 1, file);
+  }
+
+  // files content
+  for (int i = 0; i < my_tar.file_count; i++) {
+    fwrite("\n", sizeof(char), 1, file);
+    fwrite(my_tar.filenames[i], sizeof(char), strlen(my_tar.filenames[i]),
+           file);
+    fwrite(" ", sizeof(char), 1, file);
+    int size = my_tar.file_infos[i].file_size;
+    
+    fwrite(&size, sizeof(int), 1, file);
+    fwrite("\n", sizeof(char), 1, file);
+
+    fwrite(my_tar.file_contents[i], sizeof(char), size, file);
+  }
 
   fclose(file);
   tar_destructor(&my_tar);
+
+//  FILE *ffile = fopen(argv[argc - 1], "rb");
+//
+//  if (ffile == NULL) {
+//    printf("Error opening file");
+//    exit(ERROR_OPEN_FILE);
+//  }
+//  printf("%d",fgetc(file));
+//  printf("%d",fgetc(file));
 
   return 0;
 }

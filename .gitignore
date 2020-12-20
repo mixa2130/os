@@ -58,3 +58,15 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+ls_homework/launch.sh
+
+ls_homework/type_check.sh
+
+*.txt
+
+tar_homework/smth.cpp
+
+lab3/READ
+
+lab3/WRITE

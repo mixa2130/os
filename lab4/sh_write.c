@@ -95,7 +95,7 @@ int main(void) {
         printf("Value has been sent, check READ\n");
         *forward_value = tmp_value;
 
-        if (sem_wait(sem) == -1) { // Turning on the semaphore
+        if (sem_wait(sem) == -1) { // The semaphore is waiting for a READ process
             printf("sem_post errno:%d\n", errno);
             exit(EXIT_FAILURE);
         }

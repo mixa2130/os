@@ -79,12 +79,12 @@ int main(void) {
         printf("my pid:%d my time:%s \n", local_value.pid, local_value.str);
         printf("Data read from memory: %d %s\n", received_value->pid, received_value->str);
 
-        if(sem_post(sem) == -1){ // Semaphore is waiting fo a WRITE process
+        if(sem_post(sem) == -1){ // Turning on the semaphore
             printf("sem_post errno:%d\n", errno);
             exit(EXIT_FAILURE);
         }
 
         sleep(3); // To see a more detailed difference in
-        // time received and local time in READ process
+                         // time received and local time in READ process
     }
 }

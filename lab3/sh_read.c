@@ -23,7 +23,7 @@ int shm_id;
 void sh_memory_destructor(int signal)
 {
     printf("\nKeep calm and code on!\n");
-    exit(0);
+    exit(0); // Shared memory segments will be undocked
 }
 
 int main(void) {
@@ -36,9 +36,16 @@ int main(void) {
     }
 
 
-    shm_id = shmget(ipc_key, sizeof(sh_value), 0666 | IPC_CREAT);
+    shm_id = shmget(ipc_key, sizeof(sh_value), 0666 | IPC_EXCL);
     if (shm_id == -1) {
         printf("shm id errno:%d\n", errno);
+        exit(EXIT_FAILURE);
+    }
+
+    // Connect shared memory
+    sh_value *received_value = (sh_value *) shmat(shm_id, NULL, 0);
+    if (received_value == (sh_value *) -1) {
+        printf("shmat errno:%d\n", errno);
         exit(EXIT_FAILURE);
     }
 
@@ -47,23 +54,13 @@ int main(void) {
 
         time_t local_time = time(NULL);
         strncpy((char *) local_value.str, ctime(&local_time), TIME_BUFFER_SIZE_STR - 1);
+        local_value.str[TIME_BUFFER_SIZE_STR-1] = '\0';
         local_value.pid = getpid();
 
-        // Connect shared memory
-        sh_value *received_value = (sh_value *) shmat(shm_id, NULL, 0);
-        if (received_value == (sh_value *) -1) {
-            printf("shmat errno:%d\n", errno);
-            exit(EXIT_FAILURE);
-        }
 
         printf("my pid:%d my time:%s \n", local_value.pid, local_value.str);
         printf("Data read from memory: %d %s\n", received_value->pid, received_value->str);
 
-        // Disable a shared memory segment
-        if (shmdt(received_value) == -1) {
-            printf("shmdt errno:%d\n", errno);
-            exit(EXIT_FAILURE);
-        }
 
         sleep(1);
     }

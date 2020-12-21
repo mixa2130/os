@@ -63,6 +63,7 @@ int main(void) {
 
         time_t t = time(NULL);
         strncpy((char *) tmp_value.str, ctime(&t), TIME_BUFFER_SIZE_STR - 1);
+        tmp_value.str[TIME_BUFFER_SIZE_STR-1] = '\0';
 
         tmp_value.pid = getpid();
 
@@ -72,5 +73,4 @@ int main(void) {
         sleep(2); // To see a more detailed difference in
                          // time received and local time in READ process
     }
-
 }

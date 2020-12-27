@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,13 +9,16 @@
 #define ERROR_ALLOCATE_MEMORY -2
 #define ERROR_OPEN_FILE -3
 #define ERROR_GET_FILE_INFO -4
+#define MAX_FILE_SIZE 100
+#define MAX_FILE_SIZE_STR_COUNT 3
 
-#define GREETING_BYTES 12
+#define WATERMARK "TAR_BINARY_WATERMARK"
+#define GREETING_BYTES 21 // Watermark size + \n
 
 struct file_info {
-  size_t name_length;
+  int name_length;
   int file_size; // в байтах
-  //    int file_offset;// смещение относительно начала файла
+  int file_offset; // смещение относительно начала файла
 
   // положение файл в массиве файлов будет определяться индексом данной
   // структуры в tar.file_infos
@@ -27,6 +31,15 @@ struct tar {
   char **filenames;
   char **file_contents;
 };
+
+int count_filenames_header_str_size(struct tar *my_tar) {
+
+  int size = GREETING_BYTES;
+  for (int i = 0; i < my_tar->file_count; i++) {
+    size += my_tar->file_infos[i].name_length + 1;
+  }
+  return size;
+}
 
 int get_file_binary_size(const char *filename) {
   struct stat sb;
@@ -68,7 +81,7 @@ char *with_open_file(const char *filename, const char *mode,
 void collect_tar_(int count, char *argv[], struct tar *my_tar) {
   int file_count = count - 4;
 
-  my_tar->header = "Watermark";
+  my_tar->header = WATERMARK;
   my_tar->file_count = file_count;
 
   my_tar->filenames = (char **)malloc(file_count * sizeof(char *));
@@ -95,6 +108,26 @@ void collect_tar_(int count, char *argv[], struct tar *my_tar) {
   }
 }
 
+void itoa(int number, char *destination, int base) {
+  int count = 0;
+  do {
+    if (count > MAX_FILE_SIZE) {
+      fprintf(stderr, "File is too big!\n");
+      exit(EXIT_FAILURE);
+    }
+    int digit = number % base;
+    destination[count++] = (digit > 9) ? digit - 10 + 'A' : digit + '0';
+  } while ((number /= base) != 0);
+
+  destination[count] = '\0';
+  int i;
+  for (i = 0; i < count / 2; ++i) {
+    char symbol = destination[i];
+    destination[i] = destination[count - i - 1];
+    destination[count - i - 1] = symbol;
+  }
+}
+
 void tar_destructor(struct tar *my_tar) {
   for (int i = 0; i < my_tar->file_count; i++) {
     my_tar->file_contents[i] = 0;
@@ -110,6 +143,8 @@ void tar_destructor(struct tar *my_tar) {
 
 int write_tar(int argc, char *argv[]) {
   struct tar my_tar;
+  int file_offset = GREETING_BYTES;
+
   collect_tar_(argc, argv, &my_tar);
 
   FILE *file = fopen(argv[argc - 1], "wb");
@@ -118,55 +153,107 @@ int write_tar(int argc, char *argv[]) {
     printf("Error opening file");
     exit(ERROR_OPEN_FILE);
   }
+
   // header
-  fwrite(my_tar.header, sizeof(char), strlen(my_tar.header), file);
+  fwrite(my_tar.header, sizeof(char), strlen(my_tar.header), file); // Watermark
   fwrite("\n", sizeof(char), 1, file);
 
+  for (int i = 0; i < 99; i++)
+    fwrite("", sizeof(char), 1, file);
+  fwrite("\n", sizeof(char), 1, file);
+  file_offset += 100;
+  // files content
+  for (int i = 0; i < my_tar.file_count; i++) {
+
+    //    if(i!=0){
+    //      fwrite(my_tar.header, sizeof(char), strlen(my_tar.header), file); //
+    //      Watermark fwrite("\n", sizeof(char), 1, file);
+    //    }
+
+    //    fwrite(my_tar.filenames[i], sizeof(char), strlen(my_tar.filenames[i]),
+    //           file);
+    //    fwrite(" ", sizeof(char), 1, file);
+
+    int size = my_tar.file_infos[i].file_size;
+    char size_str[MAX_FILE_SIZE];
+    itoa(size, size_str, 10);
+
+    int size_str_count = strlen(size_str);
+    file_offset += size_str_count + 1;
+
+    fwrite(size_str, sizeof(char), size_str_count, file);
+    fwrite("\n", sizeof(char), 1, file);
+    fwrite(my_tar.file_contents[i], sizeof(char), size, file);
+
+    my_tar.file_infos[i].file_offset = file_offset;
+    file_offset += size;
+  }
+
+  fseek(file, GREETING_BYTES, SEEK_SET);
   for (int i = 0; i < my_tar.file_count; i++) {
     fwrite(my_tar.filenames[i], sizeof(char), strlen(my_tar.filenames[i]),
            file);
+    fwrite(" ", sizeof(char), 1, file);
+
+    char file_size_str[MAX_FILE_SIZE];
+    int file_size = my_tar.file_infos[i].file_offset;
+    itoa(file_size, file_size_str, 10);
+
+    fwrite(file_size_str, sizeof(char), strlen(file_size_str), file);
+
     if (i + 1 != my_tar.file_count)
       fwrite(" ", sizeof(char), 1, file);
   }
 
-  // files content
-  for (int i = 0; i < my_tar.file_count; i++) {
-    fwrite("\n", sizeof(char), 1, file);
-    fwrite(my_tar.filenames[i], sizeof(char), strlen(my_tar.filenames[i]),
-           file);
-    fwrite(" ", sizeof(char), 1, file);
-    int size = my_tar.file_infos[i].file_size;
-    
-    fwrite(&size, sizeof(int), 1, file);
-    fwrite("\n", sizeof(char), 1, file);
-
-    fwrite(my_tar.file_contents[i], sizeof(char), size, file);
-  }
-
   fclose(file);
+
   tar_destructor(&my_tar);
 
-//  FILE *ffile = fopen(argv[argc - 1], "rb");
-//
-//  if (ffile == NULL) {
-//    printf("Error opening file");
-//    exit(ERROR_OPEN_FILE);
-//  }
-//  printf("%d",fgetc(file));
-//  printf("%d",fgetc(file));
+  //    FILE *ffile = fopen(argv[argc - 1], "rb");
+  //
+  //    if (ffile == NULL) {
+  //      printf("Error opening file");
+  //      exit(ERROR_OPEN_FILE);
+  //    }
+  //    printf("%d",fgetc(file));
+  //    printf("%d",fgetc(file));
 
   return 0;
 }
 
-int main(int argc, char *argv[]) {
-  char *file;
-  if (argc < 5) {
-    printf("Not enough arguments\n");
-    return -1;
+void files_in_tar(char *filename) {
+  FILE *file = fopen(filename, "rb");
+  fseek(file, GREETING_BYTES, SEEK_SET);
+  char str[MAX_FILE_SIZE];
+  fread(&str, sizeof(char), 100, file);
+
+  char *istr;
+  istr = strtok(str, " ");
+  while (istr != NULL) {
+    for (int i = 0; i < strlen(istr); i++)
+      if(!isdigit(istr[i])) {
+        printf("%s\n", istr);
+        break;
+      }
+
+    istr = strtok(NULL, " ");
   }
+}
+
+int main(int argc, char *argv[]) {
+  printf("-c create tar\n"
+         "-l - files in tar\n");
+  //  if (argc < 5) {
+  //    printf("Not enough arguments\n");
+  //    return -1;
+  //  }
 
   if (!strcmp(argv[2], "-c")) {
     int smth = write_tar(argc, argv);
+  }
+
+  if (!strcmp(argv[2], "-l")) {
+    files_in_tar(argv[argc - 1]);
   }
 
   return 0;

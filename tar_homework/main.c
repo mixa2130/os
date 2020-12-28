@@ -189,7 +189,7 @@ void write_tar(int argc, char *argv[]) {
     }
 
     int size_str_count = strlen(size_str);
-    file_offset += size_str_count + 1;
+
 
     /* File sizes line that will
      * divide files between themselves*/
@@ -199,6 +199,7 @@ void write_tar(int argc, char *argv[]) {
     fwrite(my_tar.file_contents[i], sizeof(char), size, file);
 
     my_tar.file_infos[i].file_offset = file_offset;
+    file_offset += size_str_count + 1; // file size line + \n
     file_offset += size;
   }
 
@@ -298,7 +299,7 @@ void update_tar(char *file_to_add, char *upd_tar) {
   fseek(file, file_offset, SEEK_SET);
 
   char file_size_str[MAX_FILE_SIZE];
-  if (itoa(file_offset, file_size_str, 10) == -1)
+  if (itoa(struct_file_info.file_size, file_size_str, 10) == -1)
     exit(EXIT_FAILURE);
 
   fwrite(file_size_str, sizeof(char), strlen(file_size_str), file);
@@ -338,7 +339,14 @@ void update_tar(char *file_to_add, char *upd_tar) {
   lseek(fd, offset, SEEK_SET);
   write(fd, file_to_add, strlen(file_to_add));
   write(fd, " ", 1);
-  write(fd, file_size_str, strlen(file_size_str));
+
+
+
+
+  char tar_size_str[MAX_FILE_SIZE];
+  if (itoa(file_offset, tar_size_str, 10) == -1)
+    exit(EXIT_FAILURE);
+  write(fd, tar_size_str, strlen(tar_size_str));
   write(fd, " ", 1);
 
 

@@ -1,8 +1,10 @@
 #include <ctype.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #define MAX_FILE_SIZE 100
 #define WATERMARK "TAR_BINARY_WATERMARK"
@@ -170,10 +172,10 @@ void write_tar(int argc, char *argv[]) {
 
   /* Here will be filenames and their offsets,
    * after filling other parts*/
-  for (int i = 0; i < 99; i++)
-    fwrite("", sizeof(char), 1, file);
+  for (int i = 0; i < 48; i++)
+    fwrite(" a", sizeof(char), 2, file);
   fwrite("\n", sizeof(char), 1, file);
-  file_offset += 100;
+  file_offset += 97;
 
   // Files content
   for (int i = 0; i < my_tar.file_count; i++) {
@@ -247,6 +249,8 @@ void files_in_tar(char *filename) {
   char *istr;
   istr = strtok(str, " ");
   while (istr != NULL) {
+    if (!strcmp(istr, "a"))
+      break;
 
     for (int i = 0; i < strlen(istr); i++)
       if (!isdigit(istr[i])) {
@@ -256,6 +260,71 @@ void files_in_tar(char *filename) {
 
     istr = strtok(NULL, " ");
   }
+
+  fclose(file);
+}
+
+void update_tar(char *file_to_add, char *upd_tar) {
+  struct file_info struct_file_info;
+  int file_offset = get_file_binary_size(upd_tar);
+
+  char *content = with_open_file_(file_to_add, "rb", &struct_file_info);
+
+  FILE *file = fopen(upd_tar, "r+b");
+
+  if (file == NULL) {
+    fprintf(stderr, "Error opening file");
+    exit(EXIT_FAILURE);
+  }
+
+  fseek(file, file_offset, SEEK_SET);
+
+  char file_size_str[MAX_FILE_SIZE];
+  if (itoa(file_offset, file_size_str, 10) == -1)
+    exit(EXIT_FAILURE);
+
+  fwrite(file_size_str, sizeof(char), strlen(file_size_str), file);
+  fwrite("\n", sizeof(char), 1, file);
+  fwrite(content, sizeof(char), strlen(content), file);
+
+  fclose(file);
+
+  // Header update
+  // Filenames and their offsets
+  int fd;
+  if ((fd = open(upd_tar, O_RDWR)) == -1) {
+    printf("Cannot open file.\n");
+    exit(1);
+  }
+  lseek(fd, GREETING_BYTES, SEEK_SET);
+  char buf[MAX_FILE_SIZE];
+
+  if (read(fd, buf, MAX_FILE_SIZE) != MAX_FILE_SIZE) {
+    printf("Cannot read file.\n");
+    exit(EXIT_FAILURE);
+  }
+
+  lseek(fd, GREETING_BYTES, SEEK_SET);
+  char *istr;
+  int offset = GREETING_BYTES;
+  istr = strtok(buf, " ");
+
+  while (istr != NULL) {
+    if (!strcmp(istr, "a"))
+      break;
+
+    offset += strlen(istr) + 1;
+    istr = strtok(NULL, " ");
+  }
+
+  lseek(fd, offset, SEEK_SET);
+  write(fd, file_to_add, strlen(file_to_add));
+  write(fd, " ", 1);
+  write(fd, file_size_str, strlen(file_size_str));
+  write(fd, " ", 1);
+
+
+  close(fd);
 }
 
 int main(int argc, char *argv[]) {
@@ -268,6 +337,7 @@ int main(int argc, char *argv[]) {
   if (!strcmp(argv[2], "-h")) {
     printf("-h tar man\n"
            "-c create tar\n"
+           "-u add file to existing tar\n"
            "-l files in tar\n");
   }
 
@@ -283,6 +353,16 @@ int main(int argc, char *argv[]) {
 
   if (!strcmp(argv[2], "-l"))
     files_in_tar(argv[argc - 1]);
+
+  if (!strcmp(argv[2], "-u")) {
+
+    if (argc != 5) {
+      printf("Incorrect count of arguments");
+      exit(EXIT_FAILURE);
+    }
+
+    update_tar(argv[3], argv[4]);
+  }
 
   return 0;
 }

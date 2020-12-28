@@ -1,5 +1,5 @@
 CC=gcc
-FLAGS=-o
+FLAGS=-std=c11 -o
 all: run
 
 

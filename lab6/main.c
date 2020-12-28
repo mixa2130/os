@@ -19,8 +19,8 @@ void *writer(void *args) {
     while (counter < ARRAY_SIZE) {
 
         pthread_rwlock_wrlock(&rwlock1);
-
-            common_thread_arr[counter++] = counter + 65;
+            counter++;
+            common_thread_arr[counter] = counter + 65;
             printf("counter updated\n"); // new step
 
         pthread_rwlock_unlock(&rwlock1);
@@ -34,7 +34,7 @@ void *writer(void *args) {
 void *reader(void *args) {
     while(1){
         pthread_rwlock_rdlock(&rwlock1);
-            printf("Thread: %lu. Common array size: %d\n", pthread_self(), counter);
+            printf("Thread: %lx. Common array size: %d\n", (long)pthread_self(), counter);
         pthread_rwlock_unlock(&rwlock1);
 
         if (counter == ARRAY_SIZE)

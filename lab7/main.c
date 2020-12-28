@@ -20,8 +20,8 @@ char common_thread_arr[ARRAY_SIZE];
 void *writer(void *args) {
     while (counter < ARRAY_SIZE) {
         pthread_mutex_lock(&threads_mutex);
-
-            common_thread_arr[counter++] = counter + 65;
+            counter++;
+            common_thread_arr[counter] = counter + 65;
             printf("counter updated\n"); // new step
 
         pthread_cond_wait(&cond_var, &threads_mutex);
@@ -37,7 +37,7 @@ void *reader(void *args) {
     while(1){
 
         pthread_mutex_lock(&threads_mutex);
-            printf("Thread: %lu. Common array size: %d\n", pthread_self(), counter);
+            printf("Thread: %lx. Common array size: %d\n", (long)pthread_self(), counter);
         pthread_cond_signal(&cond_var);
         pthread_mutex_unlock(&threads_mutex);
 

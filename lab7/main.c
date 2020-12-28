@@ -20,16 +20,17 @@ char common_thread_arr[ARRAY_SIZE];
 void *writer(void *args) {
     while (counter < ARRAY_SIZE) {
         pthread_mutex_lock(&threads_mutex);
+
             counter++;
             common_thread_arr[counter] = counter + 65;
             printf("counter updated\n"); // new step
 
-        pthread_cond_wait(&cond_var, &threads_mutex);
+        pthread_cond_broadcast(&cond_var);
         pthread_mutex_unlock(&threads_mutex);
 
         sleep(rand() % 3);
     }
-
+    pthread_cond_broadcast(&cond_var);
     pthread_exit(0);
 }
 
@@ -37,8 +38,10 @@ void *reader(void *args) {
     while(1){
 
         pthread_mutex_lock(&threads_mutex);
-            printf("Thread: %lx. Common array size: %d\n", (long)pthread_self(), counter);
-        pthread_cond_signal(&cond_var);
+        while (counter!=ARRAY_SIZE) {
+            pthread_cond_wait(&cond_var, &threads_mutex);
+            printf("Thread: %lx. Common array size: %d\n", (long) pthread_self(), counter);
+        }
         pthread_mutex_unlock(&threads_mutex);
 
         if (counter == ARRAY_SIZE)
@@ -55,10 +58,10 @@ int main(void) {
     pthread_t writer_thread;
 
 
-    pthread_create(&writer_thread, NULL, writer, NULL);
+
     for (int i = 0; i < READER_THREADS_NUM; i++)
         pthread_create(&reader_threads[i], NULL, reader, NULL);
-
+    pthread_create(&writer_thread, NULL, writer, NULL);
 
 
     for (int i = 0; i< READER_THREADS_NUM; i++)

@@ -172,10 +172,11 @@ void write_tar(int argc, char *argv[]) {
 
   /* Here will be filenames and their offsets,
    * after filling other parts*/
+  fwrite(" ", sizeof(char), 1, file);
   for (int i = 0; i < 48; i++)
     fwrite(" a", sizeof(char), 2, file);
   fwrite("\n", sizeof(char), 1, file);
-  file_offset += 97;
+  file_offset += 98;
 
   // Files content
   for (int i = 0; i < my_tar.file_count; i++) {
@@ -239,6 +240,14 @@ void files_in_tar(char *filename) {
     printf("Error opening file");
     exit(EXIT_FAILURE);
   }
+  char check_str[GREETING_BYTES-1];
+  fseek(file, 0, SEEK_SET);
+  fread(&check_str, sizeof(char), GREETING_BYTES-1, file);
+
+  if(strcmp(check_str, WATERMARK)){
+    printf("%s is not a tar!!\n", filename);
+    exit(EXIT_FAILURE);
+  }
 
   fseek(file, GREETING_BYTES, SEEK_SET);
 
@@ -274,6 +283,15 @@ void update_tar(char *file_to_add, char *upd_tar) {
 
   if (file == NULL) {
     fprintf(stderr, "Error opening file");
+    exit(EXIT_FAILURE);
+  }
+
+  char check_str[GREETING_BYTES-1];
+  fseek(file, 0, SEEK_SET);
+  fread(&check_str, sizeof(char), GREETING_BYTES-1, file);
+
+  if(strcmp(check_str, WATERMARK)){
+    printf("%s is not a tar!!\n", upd_tar);
     exit(EXIT_FAILURE);
   }
 
@@ -327,6 +345,54 @@ void update_tar(char *file_to_add, char *upd_tar) {
   close(fd);
 }
 
+void forget_file_in_tar(char *filename, char *tar){
+  int fd;
+  if ((fd = open(tar, O_RDWR)) == -1) {
+    printf("Cannot open file.\n");
+    exit(1);
+  }
+
+  lseek(fd, GREETING_BYTES, SEEK_SET);
+  char buf[MAX_FILE_SIZE];
+
+  if (read(fd, buf, MAX_FILE_SIZE) != MAX_FILE_SIZE) {
+    printf("Cannot read file.\n");
+    exit(EXIT_FAILURE);
+  }
+
+
+  lseek(fd, GREETING_BYTES, SEEK_SET);
+  char *istr;
+  istr = strtok(buf, " ");
+
+  write(fd, " ", 1);
+  for (int i = 0; i < 48; i++)
+    write(fd, " a", 2);
+
+  lseek(fd, GREETING_BYTES, SEEK_SET);
+  while (istr != NULL) {
+
+    if (!strcmp(filename, istr)) {
+      // Forget filename in header
+      istr = strtok(NULL, " ");
+      // Forget file size in header
+      istr = strtok(NULL, " ");
+    }
+
+    if (!strcmp(istr, "a"))
+      break;
+
+    write(fd, istr, strlen(istr));
+    write(fd, " ", 1);
+
+      istr = strtok(NULL, " ");
+  }
+
+
+  close(fd);
+
+}
+
 int main(int argc, char *argv[]) {
 
   if (argc < 4) {
@@ -338,7 +404,8 @@ int main(int argc, char *argv[]) {
     printf("-h tar man\n"
            "-c create tar\n"
            "-u add file to existing tar\n"
-           "-l files in tar\n");
+           "-d delete file in existing tar\n"
+           "-l files in existing tar\n");
   }
 
   if (!strcmp(argv[2], "-c")) {
@@ -362,6 +429,16 @@ int main(int argc, char *argv[]) {
     }
 
     update_tar(argv[3], argv[4]);
+  }
+
+  if (!strcmp(argv[2], "-d")) {
+
+    if (argc != 5) {
+      printf("Incorrect count of arguments");
+      exit(EXIT_FAILURE);
+    }
+
+    forget_file_in_tar(argv[3], argv[4]);
   }
 
   return 0;
